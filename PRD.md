@@ -102,3 +102,4 @@ Proporcionar una aplicación capaz de leer los documentos de factura en formato 
 - Configuración: la configuración general de la aplicación se define en archivos .ini; los usuarios, las contraseñas y la API key de Claude se definen en un archivo .env.
 
 <!-- Esto es una linea de prueba -->
+<!-- Segunda linea de prueba: verificar commit y push con token -->
