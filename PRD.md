@@ -100,6 +100,3 @@ Proporcionar una aplicación capaz de leer los documentos de factura en formato 
 - Riesgo: El conjunto de pruebas de RNF-03 usa facturas reales con datos de terceros, mitigación no se suben al repositorio, se copian manualmente solo para la prueba y se borran al finalizarla.
 - Dependencias: Python con FastApi, pdfplumber, Streamlit, Validación con Pydantic, API de Claude para la extracción de datos.
 - Configuración: la configuración general de la aplicación se define en archivos .ini; los usuarios, las contraseñas y la API key de Claude se definen en un archivo .env.
-
-<!-- Esto es una linea de prueba -->
-<!-- Segunda linea de prueba: verificar commit y push con token -->
