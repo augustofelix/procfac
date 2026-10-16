@@ -5,7 +5,7 @@ App que lee facturas A en PDF nativo (encabezado, ítems, totales/impuestos) y d
 un JSON estandarizado, validado por el usuario antes de descargarlo, para que otros
 sistemas contables lo importen.
 
-Los IDs de requerimientos y criterios (RF, RNF, AC) se refieren a `PRD2.md`.
+Los IDs de requerimientos y criterios (RF, RNF, AC) se refieren a `PRD.md`.
 
 ## Stack
 - Python 3.13
