@@ -1,9 +1,11 @@
 # AGENTS.md
 
 ## Propósito
-App que lee facturas en PDF nativo (encabezado, ítems, totales/impuestos) y devuelve
+App que lee facturas A en PDF nativo (encabezado, ítems, totales/impuestos) y devuelve
 un JSON estandarizado, validado por el usuario antes de descargarlo, para que otros
 sistemas contables lo importen.
+
+Los IDs de requerimientos y criterios (RF, RNF, AC) se refieren a `PRD2.md`.
 
 ## Stack
 - Python 3.13
@@ -22,12 +24,16 @@ sistemas contables lo importen.
 
 ## Qué NO hacer
 - No procesar más de un archivo PDF por petición ni un PDF con más de una factura
-  (RNF-01, RNF-05): nada de lotes. Si la API recibe más de un archivo, responder
-  HTTP 422 (AC-19).
-- No procesar comprobantes fuera de alcance: solo se admiten facturas tipo A, M y
-  FCE MiPyME A; nada de notas de crédito/débito, recibos, remitos, liquidaciones, ni
-  comprobantes tipo B, C, E o X. Los comprobantes fuera de alcance y los PDF con más
-  de una factura se rechazan antes de enviarlos a la API de Claude (RF-18, AC-14, AC-18).
+  (RNF-01, RNF-05): nada de lotes. Si la API recibe 0 archivos o más de uno, responder
+  HTTP 422 (AC-19). Las copias ORIGINAL, DUPLICADO y TRIPLICADO de una misma factura
+  cuentan como una sola factura (RF-18, AC-36).
+- No procesar comprobantes fuera de alcance: solo se admiten facturas tipo A; nada de
+  facturas M ni FCE MiPyME A, notas de crédito/débito, recibos, remitos, liquidaciones,
+  ni comprobantes tipo B, C, E o X. Los comprobantes fuera de alcance, los PDF con más
+  de una factura y los PDF de más de 3 páginas se rechazan antes de enviarlos a la API
+  de Claude (RF-18, RF-24, RF-28, AC-14, AC-18, AC-33).
+- No aceptar archivos que no sean PDF: el selector solo permite `.pdf` y la API
+  responde HTTP 422 (RF-29, AC-34, AC-35).
 - No enviar el contenido de la factura a la API de Claude sin antes advertir al usuario
   y obtener su consentimiento (riesgo de datos sensibles); si no acepta, cancelar el
   proceso y volver a la pantalla de carga (RF-10, RF-11, RF-20).
@@ -38,15 +44,24 @@ sistemas contables lo importen.
   (RF-05, AC-04, AC-30).
 - No asumir un solo usuario a la vez: hasta 5 usuarios pueden procesar un PDF cada uno
   al mismo tiempo (RNF-04, AC-29).
-- No almacenar el PDF ni el JSON resultante (RNF-07).
+- No escribir el PDF ni el JSON en el sistema de archivos del servidor en ningún momento
+  del proceso: todo se procesa en memoria (RNF-07, AC-22). Ojo: FastAPI guarda en un
+  archivo temporal en disco los archivos subidos de más de 1 MB.
+- No reintentar la llamada a la API de Claude: si devuelve un error, no responde en
+  60 segundos o su respuesta no se puede leer o no cumple el Esquema de salida, mostrar
+  un mensaje y cancelar el proceso (RF-26, RF-27, AC-32).
 - No hardcodear la API key de Claude ni las credenciales de los usuarios en el código
   fuente: se cargan desde el archivo `.env`.
 - No commitear el archivo `.env`: las contraseñas de los usuarios y la API key de Claude
   están en texto plano.
-- No commitear las facturas reales ni los JSON esperados del conjunto de pruebas de
-  RNF-03: se copian manualmente en `tests/data/` (ignorada en `.gitignore`) solo para
-  la prueba y se borran al finalizarla.
+- No commitear las facturas reales del Conjunto de referencia ni el PDF de AC-36, ni
+  sus JSON esperados: se copian manualmente en `tests/data/` (ignorada en `.gitignore`)
+  solo para la prueba y se borran al finalizarla.
+- No commitear los PDF armados para la prueba (AC-11, AC-13, AC-14, AC-18 y AC-33) ni
+  el JSON esperado de AC-11: también van en `tests/data/`.
 - No agregar funcionalidades fuera del alcance del MVP: validación de los datos
   corregidos o completados por el usuario, recepción o envío por email, integración
   con sistemas contables, gestión de usuarios desde la aplicación (alta, baja, cambio o
-  recuperación de contraseña).
+  recuperación de contraseña), cierre o vencimiento de sesión, reintentos automáticos de
+  la API de Claude, límite de tamaño en bytes del PDF, y los campos de ítem reservados
+  para la versión 2 (unidad de medida, bonificación, alícuota de IVA, subtotal con IVA).
