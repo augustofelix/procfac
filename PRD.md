@@ -160,3 +160,5 @@ El PDF de AC-36 es una factura A real descargada con sus copias ORIGINAL, DUPLIC
 - Riesgo: El Conjunto de referencia y el PDF de AC-36 usan facturas reales con datos de terceros, mitigación no se suben al repositorio, se copian manualmente solo para la prueba y se borran al finalizarla.
 - Dependencias: Python con FastAPI, pdfplumber, Streamlit, Validación con Pydantic, API de Claude para la extracción de datos.
 - Configuración: la configuración general de la aplicación se define en archivos .ini; los usuarios, las contraseñas y la API key de Claude se definen en un archivo .env.
+
+<!-- Prueba de funcionalidad de commit -->
