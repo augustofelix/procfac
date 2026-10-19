@@ -53,6 +53,7 @@ def mostrar_aviso() -> None:
 def volver_a_carga() -> None:
     """Cancela el proceso sin entregar ningún JSON y vacía el selector de archivos."""
     st.session_state.pop("pdf", None)
+    st.session_state.pop("consentimiento", None)
     st.session_state.carga_id = st.session_state.get("carga_id", 0) + 1
     st.rerun()
 
@@ -113,13 +114,41 @@ def pantalla_carga() -> None:
         volver_a_carga()
     # El PDF queda solo en memoria, en la sesión del usuario (RNF-07)
     st.session_state.pdf = (archivo.name, contenido)
-    st.success("El PDF se puede procesar.")
+    st.rerun()
+
+
+def pantalla_consentimiento() -> None:
+    nombre, _ = st.session_state.pdf
+    st.subheader("Consentimiento")
+    # Nada se envía a Claude mientras el usuario no acepte (RF-10, RF-20, AC-06)
+    st.warning(
+        f"El contenido de la factura **{nombre}** se enviará a la API de Claude (Anthropic) "
+        "para extraer sus datos. La factura puede contener datos sensibles. "
+        "¿Aceptás enviarla?"
+    )
+    aceptar, rechazar = st.columns(2)
+    if aceptar.button("Aceptar y enviar", type="primary"):
+        st.session_state.consentimiento = True
+        st.rerun()
+    if rechazar.button("Rechazar"):
+        # Cancela el proceso sin llamar a Claude ni entregar JSON (RF-11, AC-07)
+        avisar("info", "Proceso cancelado: la factura no se envió.")
+        volver_a_carga()
+
+
+def pantalla_extraccion() -> None:
+    st.subheader("Extracción")
+    st.info("La extracción con Claude se agrega en la Funcionalidad 3.")
 
 
 st.set_page_config(page_title="procfac")
 st.title("Procesamiento de facturas A")
 
-if "token" in st.session_state:
-    pantalla_carga()
-else:
+if "token" not in st.session_state:
     pantalla_login()
+elif "pdf" not in st.session_state:
+    pantalla_carga()
+elif not st.session_state.get("consentimiento"):
+    pantalla_consentimiento()
+else:
+    pantalla_extraccion()
