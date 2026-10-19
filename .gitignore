@@ -1,0 +1,11 @@
+# Credenciales de usuarios y API key de Claude en texto plano (AGENTS.md)
+.env
+
+# Facturas reales, PDF armados para la prueba y sus JSON esperados (AGENTS.md)
+tests/data/
+
+# Entorno y cachés de Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
