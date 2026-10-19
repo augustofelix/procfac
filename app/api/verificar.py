@@ -7,9 +7,12 @@ from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
 from app.api.auth import usuario_actual
+from app.core.config import cargar_config
 from app.core.verificacion import Rechazo, verificar_pdf
 
 router = APIRouter()
+
+MAX_PAGINAS = cargar_config()["pdf"].getint("max_paginas")
 
 CANTIDAD_ARCHIVOS = Rechazo("cantidad_archivos", "Se debe enviar exactamente un archivo PDF.")
 
@@ -44,4 +47,4 @@ async def verificar(
     usuario: Annotated[str, Depends(usuario_actual)],
     contenido: Annotated[bytes, Depends(leer_pdf_subido)],
 ) -> None:
-    await run_in_threadpool(verificar_pdf, contenido)
+    await run_in_threadpool(verificar_pdf, contenido, MAX_PAGINAS)
