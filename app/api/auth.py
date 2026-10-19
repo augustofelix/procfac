@@ -5,6 +5,7 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from app.core.sesiones import Sesiones
@@ -14,6 +15,7 @@ RUTA_ENV = Path(__file__).resolve().parents[2] / ".env"
 
 router = APIRouter()
 _sesiones = Sesiones()
+_bearer = HTTPBearer(auto_error=False)
 
 
 @lru_cache
@@ -44,3 +46,18 @@ def login(
     if not credenciales_validas(usuarios, credenciales.usuario, credenciales.contrasena):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario o contraseña incorrectos")
     return Sesion(token=sesiones.crear(credenciales.usuario))
+
+
+def usuario_actual(
+    credenciales: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    sesiones: Annotated[Sesiones, Depends(obtener_sesiones)],
+) -> str:
+    """Exige un token de sesión válido; si no, responde 401 (RF-09, AC-05)."""
+    usuario = sesiones.usuario(credenciales.credentials) if credenciales else None
+    if usuario is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Sesión no iniciada",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return usuario
