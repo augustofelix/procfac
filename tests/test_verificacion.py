@@ -91,7 +91,23 @@ def test_pdf_escaneado_sin_texto_se_rechaza():
 
 @pytest.mark.parametrize(
     ("texto", "esperado"),
-    [("COD. 01", 1), ("Cód. 01", 1), ("CODIGO N° 01", 1), ("Código Nº: 01", 1), ("COD.201", 201), ("Hola", None)],
+    [
+        ("COD. 01", 1),
+        ("Cód. 01", 1),
+        ("CODIGO N° 01", 1),
+        ("Código Nº: 01", 1),
+        ("Cod. 1", 1),
+        ("Código N° 1", 1),
+        ("Código Nro001 Factura", 1),
+        ("A\n01 FACTURA", 1),
+        ("COD.201", 201),
+        ("201 FACTURA DE CRÉDITO ELECTRÓNICA", 201),
+        ("Código Pago Electrónico", None),
+        ("Codigo: ceac96991", None),
+        ("Código 1234567", None),
+        ("Total Factura: $ 45,500.01", None),
+        ("Hola", None),
+    ],
 )
 def test_codigo_comprobante(texto, esperado):
     assert codigo_comprobante(texto) == esperado

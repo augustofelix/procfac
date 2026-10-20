@@ -9,7 +9,11 @@ NO_FACTURA_A = "No se pudo identificar el comprobante como factura A."
 # Código AFIP del tipo de comprobante: 01 es factura A; 51 factura M, 201 FCE MiPyME A,
 # 02/03 notas de débito/crédito A, 06 factura B, 11 factura C, 19 factura E, etc.
 CODIGO_FACTURA_A = 1
-_CODIGO = re.compile(r"\bC[OÓ]D(?:IGO)?\.?\s*(?:N\s*[°ºo]?\.?\s*)?:?\s*(\d{2,3})\b", re.IGNORECASE)
+# "COD. 01", "Cod. 1", "Código N° 01", "Código Nro001" o "01 FACTURA" al comienzo de una línea
+_CODIGO = (
+    re.compile(r"\bC[OÓ]D(?:IGO)?\.?\s*(?:N(?:RO|°|º|O)?\.?\s*)?:?\s*(\d{1,3})\b", re.IGNORECASE),
+    re.compile(r"^\s*(\d{2,3})\s+FACTURA\b", re.IGNORECASE | re.MULTILINE),
+)
 
 # Punto de venta y número: "Punto de Venta: 00003 Comp. Nro: 00001234" o "N° 0003-00001234"
 _NUMERACION = (
@@ -44,9 +48,12 @@ def _causado_por(error: BaseException, tipo: type[BaseException]) -> bool:
 
 
 def codigo_comprobante(texto: str) -> int | None:
-    """Primer código de tipo de comprobante de la página ("COD. 01", "Código N° 01")."""
-    coincidencia = _CODIGO.search(texto)
-    return int(coincidencia.group(1)) if coincidencia else None
+    """Primer código de tipo de comprobante de la página."""
+    for patron in _CODIGO:
+        coincidencia = patron.search(texto)
+        if coincidencia:
+            return int(coincidencia.group(1))
+    return None
 
 
 def numeracion(texto: str) -> tuple[int, int] | None:
