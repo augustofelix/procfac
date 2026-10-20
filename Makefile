@@ -2,7 +2,7 @@
 API_PORT ?= 8000
 UI_PORT ?= 8501
 
-.PHONY: dev api ui test evaluar
+.PHONY: dev api ui test evaluar cargar-json
 
 # Levanta backend y UI juntos; Ctrl+C detiene ambos
 dev:
@@ -21,3 +21,7 @@ test:
 # Ejemplos: make evaluar, make evaluar ARGS=--detalle, make evaluar ARGS="--simultaneas 5"
 evaluar:
 	uv run python -m tests.evaluacion $(ARGS)
+
+# Carga manual de los JSON esperados de tests/data/ (no llama a Claude)
+cargar-json:
+	uv run streamlit run tests/carga_manual.py --server.port 8502 --server.headless true
