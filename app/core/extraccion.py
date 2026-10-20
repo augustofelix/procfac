@@ -6,6 +6,7 @@ import anthropic
 from pydantic import ValidationError
 
 from app.core.esquema import Factura
+from app.core.normalizacion import normalizar
 
 log = logging.getLogger(__name__)
 
@@ -81,4 +82,4 @@ class Extractor:
         if respuesta.stop_reason != "end_turn" or respuesta.parsed_output is None:
             # refusal o max_tokens: la salida puede no cumplir el esquema
             raise FalloExtraccion(f"Respuesta de Claude incompleta (stop_reason={respuesta.stop_reason})")
-        return respuesta.parsed_output
+        return normalizar(respuesta.parsed_output)
