@@ -2,7 +2,7 @@
 API_PORT ?= 8000
 UI_PORT ?= 8501
 
-.PHONY: dev api ui test
+.PHONY: dev api ui test evaluar
 
 # Levanta backend y UI juntos; Ctrl+C detiene ambos
 dev:
@@ -16,3 +16,8 @@ ui:
 
 test:
 	uv run pytest
+
+# Contra el Conjunto de referencia de tests/data/; llama a la API real de Claude.
+# Ejemplos: make evaluar, make evaluar ARGS=--detalle, make evaluar ARGS="--simultaneas 5"
+evaluar:
+	uv run python -m tests.evaluacion $(ARGS)
