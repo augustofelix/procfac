@@ -5,6 +5,7 @@ esperado al lado (mismo nombre, extensión .json) es una factura del conjunto.
 
     uv run python -m tests.evaluacion                  # precisión y p95 (AC-01, AC-15, AC-16, AC-20, AC-21, AC-27, AC-31)
     uv run python -m tests.evaluacion --simultaneas 5  # 5 extracciones a la vez (AC-29)
+    uv run python -m tests.evaluacion --pdf 01 07      # solo esas facturas
 
 Solo informa nombres de campos y porcentajes, nunca valores de las facturas.
 """
@@ -85,13 +86,28 @@ async def _extraer_midiendo(extractor, contenido: bytes) -> tuple[dict | None, f
         return None, time.perf_counter() - inicio, str(fallo)
 
 
-def _conjunto() -> list[tuple[Path, dict]]:
+def _elegir(pdfs: list[Path], nombres: list[str]) -> list[Path]:
+    """Los PDF pedidos por nombre, con o sin extensión y sin distinguir mayúsculas."""
+    elegidos = []
+    for nombre in nombres:
+        coincidencias = [pdf for pdf in pdfs if nombre.lower() in (pdf.name.lower(), pdf.stem.lower())]
+        if not coincidencias:
+            raise SystemExit(f"No existe {nombre} en {CARPETA}")
+        if not coincidencias[0].with_suffix(".json").exists():
+            raise SystemExit(f"Falta el JSON esperado {coincidencias[0].with_suffix('.json').name} en {CARPETA}")
+        elegidos.append(coincidencias[0])
+    return elegidos
+
+
+def _conjunto(nombres: list[str] | None = None) -> list[tuple[Path, dict]]:
     pdfs = sorted(p for p in CARPETA.iterdir() if p.suffix.lower() == ".pdf")
+    if nombres:
+        pdfs = _elegir(pdfs, nombres)
     return [(pdf, json.loads(pdf.with_suffix(".json").read_text(encoding="utf-8"))) for pdf in pdfs if pdf.with_suffix(".json").exists()]
 
 
-async def evaluar(detalle: bool) -> None:
-    conjunto = _conjunto()
+async def evaluar(detalle: bool, nombres: list[str] | None = None) -> None:
+    conjunto = _conjunto(nombres)
     if not conjunto:
         raise SystemExit(f"No hay PDF con su JSON esperado en {CARPETA}")
     extractor = obtener_extractor()
@@ -136,9 +152,9 @@ def _aceptado(pdf: Path) -> bool:
     return True
 
 
-async def evaluar_simultaneas(cantidad: int) -> None:
+async def evaluar_simultaneas(cantidad: int, nombres: list[str] | None = None) -> None:
     # Solo PDF que pasan los filtros previos: nada fuera de alcance llega a Claude
-    conjunto = [(pdf, esperada) for pdf, esperada in _conjunto() if _aceptado(pdf)][:cantidad]
+    conjunto = [(pdf, esperada) for pdf, esperada in _conjunto(nombres) if _aceptado(pdf)][:cantidad]
     if len(conjunto) < cantidad:
         raise SystemExit(f"Se necesitan {cantidad} PDF con su JSON esperado en {CARPETA}")
     extractor = obtener_extractor()
@@ -151,11 +167,14 @@ def main() -> None:
     argumentos = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     argumentos.add_argument("--simultaneas", type=int, help="extrae N facturas a la vez y mide cada tiempo (AC-29)")
     argumentos.add_argument("--detalle", action="store_true", help="lista las métricas que no coinciden por factura")
+    argumentos.add_argument(
+        "--pdf", nargs="+", metavar="NOMBRE", help="evalúa solo esos PDF de tests/data/ (por ejemplo 01 o 01.PDF)"
+    )
     opciones = argumentos.parse_args()
     if opciones.simultaneas:
-        asyncio.run(evaluar_simultaneas(opciones.simultaneas))
+        asyncio.run(evaluar_simultaneas(opciones.simultaneas, opciones.pdf))
     else:
-        asyncio.run(evaluar(opciones.detalle))
+        asyncio.run(evaluar(opciones.detalle, opciones.pdf))
 
 
 if __name__ == "__main__":

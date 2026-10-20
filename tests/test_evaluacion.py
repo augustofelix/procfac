@@ -1,7 +1,9 @@
+import json
+
 import pytest
 
 from tests.claude_simulado import factura
-from tests.evaluacion import METRICAS, comparar, percentil_95
+from tests.evaluacion import METRICAS, _conjunto, comparar, percentil_95
 
 ITEMS = [
     {"codigo": "A1", "descripcion": "Tornillo", "cantidad": 2.5, "precio_unitario": 40.0, "subtotal_item": 100.0},
@@ -72,3 +74,40 @@ def test_percentil_95_por_rango_mas_cercano():
     tiempos = [float(n) for n in range(1, 21)]
     assert percentil_95(tiempos) == 19.0
     assert percentil_95([5.0]) == 5.0
+
+
+@pytest.fixture
+def carpeta(tmp_path, monkeypatch):
+    import tests.evaluacion as evaluacion
+
+    for nombre in ("01.PDF", "02.pdf", "03.PDF"):
+        (tmp_path / nombre).write_bytes(b"%PDF-1.4")
+    for nombre in ("01.json", "02.json"):
+        (tmp_path / nombre).write_text(json.dumps(ESPERADA), encoding="utf-8")
+    monkeypatch.setattr(evaluacion, "CARPETA", tmp_path)
+    return tmp_path
+
+
+def test_sin_pdf_elegidos_usa_todos_los_que_tienen_json(carpeta):
+    assert [pdf.name for pdf, _ in _conjunto()] == ["01.PDF", "02.pdf"]
+
+
+@pytest.mark.parametrize("nombre", ["01", "01.PDF", "01.pdf"])
+def test_elige_un_pdf_con_o_sin_extension(carpeta, nombre):
+    conjunto = _conjunto([nombre])
+    assert [pdf.name for pdf, _ in conjunto] == ["01.PDF"]
+    assert conjunto[0][1] == ESPERADA
+
+
+def test_elige_varios_pdf_en_el_orden_pedido(carpeta):
+    assert [pdf.name for pdf, _ in _conjunto(["02", "01"])] == ["02.pdf", "01.PDF"]
+
+
+def test_pdf_inexistente_corta_con_mensaje(carpeta):
+    with pytest.raises(SystemExit, match="No existe 99"):
+        _conjunto(["99"])
+
+
+def test_pdf_sin_json_esperado_corta_con_mensaje(carpeta):
+    with pytest.raises(SystemExit, match="Falta el JSON esperado 03.json"):
+        _conjunto(["03"])

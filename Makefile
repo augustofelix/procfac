@@ -18,7 +18,8 @@ test:
 	uv run pytest
 
 # Contra el Conjunto de referencia de tests/data/; llama a la API real de Claude.
-# Ejemplos: make evaluar, make evaluar ARGS=--detalle, make evaluar ARGS="--simultaneas 5"
+# Ejemplos: make evaluar, make evaluar ARGS=--detalle, make evaluar ARGS="--simultaneas 5",
+#          make evaluar ARGS="--pdf 01.PDF --detalle"
 evaluar:
 	uv run python -m tests.evaluacion $(ARGS)
 
