@@ -17,7 +17,20 @@ Reglas:
 - Emisor es quien emite la factura (encabezado); receptor es el cliente al que se le factura.
 - Copiá los textos tal como figuran en el PDF (razón social, domicilio, localidad, \
 condición frente al IVA, condición de venta, descripciones de ítems e impuestos), \
-sin corregirlos ni completarlos.
+sin corregirlos ni completarlos. No copies el rótulo del campo (por ejemplo "IVA:" o \
+"Cond.de venta:"), pero sí el valor completo aunque empiece con "IVA" (por ejemplo \
+"IVA Resp.Inscripto" o "IVA: IVA Responsable Inscripto" → "IVA Responsable Inscripto"); \
+tampoco copies rótulos vacíos o relleno (por ejemplo "Piso : - Depto:", o el " ." de \
+"Empresa SRL. ." → "Empresa SRL.").
+- razon_social_emisor: la razón social del titular del CUIT, aunque el nombre de fantasía \
+o la marca figuren más destacados. Si no está rotulada, el nombre de la persona o empresa \
+que figure como responsable (titular, director, propietario), no el nombre de fantasía.
+- domicilio: calle, número, piso y departamento. localidad: lo que sigue al domicilio en \
+el mismo renglón o, si no hay nada, solo el renglón siguiente (localidad, código postal y \
+provincia, tal como figuran). Si el PDF rotula domicilio y localidad por separado, \
+respetá los rótulos.
+- condicion_venta: la condición o forma de pago, aunque no esté rotulada \
+(por ejemplo "Se cobra por Debito Automatico").
 - Si un campo no figura en el comprobante o no se puede leer, devolvé "" (cadena vacía) \
 si es de texto o null si es numérico. No inventes valores.
 - items e impuestos: null si no se pudieron leer; [] si el comprobante no tiene ninguno.
@@ -29,7 +42,10 @@ tomá los datos de una sola copia: no repitas los ítems.
 - Importes y cantidades: números con punto decimal, sin separador de miles ni símbolo de moneda.
 - subtotal: el subtotal del pie del comprobante, antes de impuestos. total: el importe total.
 - impuestos: un elemento por cada impuesto o percepción del pie (por ejemplo IVA 21%), \
-con descripcion_impuesto tal como figura y su importe. No incluyas el subtotal ni el total.
+con descripcion_impuesto tal como figura y su importe. No incluyas el subtotal ni el total. \
+Si el pie es una tabla y la celda del impuesto tiene solo la alícuota, anteponé el \
+encabezado de la columna (por ejemplo "IVA 10,50%"). Omití los impuestos con importe 0 \
+y las aclaraciones entre paréntesis de la descripción (por ejemplo "(Neto gravado $ 1000)").
 - items: un elemento por cada línea del detalle, en el orden del comprobante, con codigo, \
 descripcion, cantidad, precio_unitario y subtotal_item tal como figuran.
 """
