@@ -99,6 +99,18 @@ def _clasificar(obtenido, esperado) -> str | None:
     return "tipo distinto"
 
 
+def _sin_coincidencias(obtenidos: list[tuple[int, dict]], esperados: list[dict]):
+    """Los obtenidos (con su posición) y los esperados que no tienen un par idéntico."""
+    pendientes = list(esperados)
+    sobrantes = []
+    for posicion, o in obtenidos:
+        if o in pendientes:
+            pendientes.remove(o)
+        else:
+            sobrantes.append((posicion, o))
+    return sobrantes, pendientes
+
+
 def diferencias(obtenida: dict, esperada: dict) -> list[str]:
     """Una línea por diferencia entre lo obtenido y lo esperado, sin valores."""
     lineas = [
@@ -114,8 +126,12 @@ def diferencias(obtenida: dict, esperada: dict) -> list[str]:
             continue
         if len(obtenidos) != len(esperados):
             lineas.append(f"{lista}: esperados {len(esperados)}, obtenidos {len(obtenidos)}")
-        # Por posición; impuestos no exige orden, pero así se ve en qué campo difiere cada uno
-        for posicion, (o, e) in enumerate(zip(obtenidos, esperados), 1):
+        pares = list(enumerate(obtenidos, 1))
+        if lista == "impuestos":
+            # Sin exigir orden: se descartan los pares que coinciden y el resto se compara
+            # en el orden en que quedan, con la posición que tienen en lo obtenido
+            pares, esperados = _sin_coincidencias(pares, esperados)
+        for (posicion, o), e in zip(pares, esperados):
             for campo in campos:
                 if motivo := _clasificar(o[campo], e[campo]):
                     lineas.append(f"{lista}[{posicion}].{campo}: {motivo}")

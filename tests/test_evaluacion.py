@@ -151,3 +151,12 @@ def test_diferencias_sin_mostrar_valores():
         "items[1].descripcion: difieren solo en mayúsculas o espacios",
     ]
     assert not any("Tornillo" in linea or "139" in linea for linea in lineas)
+
+
+def test_diferencias_de_impuestos_sin_importar_el_orden():
+    from tests.evaluacion import diferencias
+
+    iva, percepcion = ESPERADA["impuestos"]
+    obtenida = ESPERADA | {"impuestos": [percepcion | {"importe": 1.0}, iva]}
+    assert diferencias(obtenida, ESPERADA) == ["impuestos[1].importe: número distinto"]
+    assert diferencias(ESPERADA | {"impuestos": [percepcion, iva]}, ESPERADA) == []
