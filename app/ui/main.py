@@ -2,12 +2,20 @@ import httpx
 import streamlit as st
 
 from app.core.config import cargar_config
+from app.ui import validacion
 
 BACKEND_URL = cargar_config()["ui"]["backend_url"]
+# Margen sobre el tope de espera de Claude del backend (RF-26)
+TIMEOUT_EXTRACCION = cargar_config()["claude"].getfloat("timeout_segundos") + 30
+FALLO_EXTRACCION = "No se pudo completar la extracción."
 
 
 class SesionPerdida(Exception):
     """El backend no reconoce el token, por ejemplo porque se reinició y perdió las sesiones."""
+
+
+class ProcesoCancelado(Exception):
+    """El backend rechazó el PDF o falló la extracción; el mensaje es para el usuario."""
 
 
 def iniciar_sesion(usuario: str, contrasena: str) -> str | None:
@@ -39,6 +47,22 @@ def verificar(nombre: str, contenido: bytes) -> str | None:
     return None
 
 
+def extraer(nombre: str, contenido: bytes) -> dict:
+    """Envía el PDF a extraer con Claude; los campos vuelven en esta misma petición (RNF-06)."""
+    respuesta = httpx.post(
+        f"{BACKEND_URL}/extraer",
+        files={"archivo": (nombre, contenido, "application/pdf")},
+        headers={"Authorization": f"Bearer {st.session_state.token}"},
+        timeout=TIMEOUT_EXTRACCION,
+    )
+    if respuesta.status_code == 401:
+        raise SesionPerdida
+    if respuesta.status_code in (422, 502):
+        raise ProcesoCancelado(respuesta.json()["detail"]["mensaje"])
+    respuesta.raise_for_status()
+    return respuesta.json()
+
+
 def avisar(tipo: str, mensaje: str) -> None:
     """Deja un mensaje para mostrar en la próxima pantalla."""
     st.session_state.aviso = (tipo, mensaje)
@@ -52,8 +76,8 @@ def mostrar_aviso() -> None:
 
 def volver_a_carga() -> None:
     """Cancela el proceso sin entregar ningún JSON y vacía el selector de archivos."""
-    st.session_state.pop("pdf", None)
-    st.session_state.pop("consentimiento", None)
+    for clave in ("pdf", "consentimiento", "factura", "validada"):
+        st.session_state.pop(clave, None)
     st.session_state.carga_id = st.session_state.get("carga_id", 0) + 1
     st.rerun()
 
@@ -137,8 +161,33 @@ def pantalla_consentimiento() -> None:
 
 
 def pantalla_extraccion() -> None:
-    st.subheader("Extracción")
-    st.info("La extracción con Claude se agrega en la Funcionalidad 3.")
+    if "factura" not in st.session_state:
+        nombre, contenido = st.session_state.pdf
+        try:
+            with st.spinner("Extrayendo los datos con Claude..."):
+                st.session_state.factura = extraer(nombre, contenido)
+        except SesionPerdida:
+            perder_sesion()
+        except ProcesoCancelado as cancelado:
+            # Sin reintentos: se informa y se cancela el proceso (RF-26, RF-27, AC-32)
+            avisar("error", str(cancelado))
+            volver_a_carga()
+        except httpx.HTTPError:
+            avisar("error", FALLO_EXTRACCION)
+            volver_a_carga()
+    pantalla_validacion()
+
+
+def pantalla_validacion() -> None:
+    st.subheader("Validar campos")
+    decision = validacion.formulario(st.session_state.factura, str(st.session_state.get("carga_id", 0)))
+    if decision is None:
+        return
+    accion, _ = decision
+    if accion == "cancelar":
+        # RF-14, AC-10
+        avisar("info", "Proceso cancelado: no se entregó ningún JSON.")
+        volver_a_carga()
 
 
 st.set_page_config(page_title="procfac")
