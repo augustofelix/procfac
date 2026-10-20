@@ -5,6 +5,7 @@ import httpx
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from app.core.esquema import Factura
 from tests.pdfs import FACTURA_A
 
 RUTA_UI = str(Path(__file__).resolve().parents[1] / "app" / "ui" / "main.py")
@@ -84,8 +85,12 @@ def test_rechazar_consentimiento_vuelve_a_la_carga_sin_llamar_a_claude(at):
     assert at.file_uploader[0].value is None
 
 
-def test_aceptar_consentimiento_pasa_a_la_extraccion(at):
+def test_aceptar_consentimiento_extrae_y_pasa_a_validar(at):
     subir(at, respuesta(204))
-    boton(at, "Aceptar y enviar").click().run()
-    assert at.subheader[0].value == "Extracción"
+    factura = {campo: None for campo in Factura.model_fields}
+    with patch("httpx.post", return_value=respuesta(200, factura)) as post:
+        boton(at, "Aceptar y enviar").click().run()
+    assert post.call_count == 1
+    assert post.call_args.args[0].endswith("/extraer")
+    assert at.subheader[0].value == "Validar campos"
     assert at.session_state.consentimiento is True
