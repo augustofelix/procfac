@@ -5,7 +5,7 @@ import logging
 import anthropic
 from pydantic import ValidationError
 
-from app.core.esquema import Factura
+from app.core.esquema import Factura, FacturaExtraida
 from app.core.normalizacion import normalizar
 
 log = logging.getLogger(__name__)
@@ -18,7 +18,8 @@ Reglas:
 - Copiá los textos tal como figuran en el PDF (razón social, domicilio, localidad, \
 condición frente al IVA, condición de venta, descripciones de ítems e impuestos), \
 sin corregirlos ni completarlos.
-- Si un campo no figura en el comprobante o no se puede leer, devolvé null. No inventes valores.
+- Si un campo no figura en el comprobante o no se puede leer, devolvé "" (cadena vacía) \
+si es de texto o null si es numérico. No inventes valores.
 - items e impuestos: null si no se pudieron leer; [] si el comprobante no tiene ninguno.
 - Si el PDF trae las copias ORIGINAL, DUPLICADO y TRIPLICADO de la misma factura, \
 tomá los datos de una sola copia: no repitas los ítems.
@@ -55,7 +56,7 @@ class Extractor:
                     max_tokens=16000,
                     system=INSTRUCCIONES,
                     output_config={"effort": self.esfuerzo},
-                    output_format=Factura,
+                    output_format=FacturaExtraida,
                     messages=[
                         {
                             "role": "user",

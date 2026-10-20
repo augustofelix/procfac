@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.api.extraer import obtener_extractor
-from app.core.esquema import Factura, Item
+from app.core.esquema import Factura, FacturaExtraida, Item
 from app.core.extraccion import Extractor, FalloExtraccion
 from tests.claude_simulado import PETICION, ClaudeSimulado, factura, respuesta
 from tests.pdfs import FACTURA_A
@@ -24,7 +24,7 @@ def test_envia_el_pdf_como_documento_con_el_esquema_de_salida():
     parametros = claude.llamadas[0]
     assert parametros["model"] == "claude-opus-5-5"
     assert parametros["output_config"] == {"effort": "low"}
-    assert parametros["output_format"] is Factura
+    assert parametros["output_format"] is FacturaExtraida
     documento = parametros["messages"][0]["content"][0]
     assert documento["type"] == "document"
     assert documento["source"]["media_type"] == "application/pdf"
@@ -97,3 +97,36 @@ def test_cliente_real_sin_reintentos_y_con_timeout_de_config():
         assert extractor.modelo == "claude-opus-5-5"
     finally:
         obtener_extractor.cache_clear()
+
+
+def _uniones(esquema: dict) -> int:
+    """Propiedades con anyOf o lista de tipos, en el objeto y en sus $defs."""
+    objetos = [esquema, *esquema.get("$defs", {}).values()]
+    return sum(
+        "anyOf" in propiedad or isinstance(propiedad.get("type"), list)
+        for objeto in objetos
+        for propiedad in objeto.get("properties", {}).values()
+    )
+
+
+def test_esquema_pedido_a_claude_respeta_el_limite_de_uniones():
+    # La salida estructurada de la API rechaza con 400 más de 16 campos con unión
+    assert _uniones(FacturaExtraida.model_json_schema()) <= 16
+    assert list(FacturaExtraida.model_fields) == list(Factura.model_fields)
+
+
+def test_textos_vacios_de_claude_pasan_a_null():
+    textos = {campo: "" for campo, info in FacturaExtraida.model_fields.items() if info.annotation is str}
+    numeros = {"punto_venta": 3, "numero_comprobante": None, "subtotal": None, "total": 10.0}
+    extraida = FacturaExtraida(
+        **textos,
+        **numeros,
+        impuestos=[{"descripcion_impuesto": "", "importe": 1.0}],
+        items=[{"codigo": "", "descripcion": "Tornillo", "cantidad": 1, "precio_unitario": None, "subtotal_item": 2.0}],
+    )
+    resultado = extraer(ClaudeSimulado(respuesta(extraida)))
+    assert all(getattr(resultado, campo) is None for campo in textos)
+    assert resultado.punto_venta == 3
+    assert resultado.impuestos[0].descripcion_impuesto is None
+    assert resultado.items[0].codigo is None
+    assert resultado.items[0].descripcion == "Tornillo"

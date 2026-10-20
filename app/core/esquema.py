@@ -46,6 +46,45 @@ class Factura(_Estricto):
     items: list[Item] | None
 
 
+# Lo que se le pide a Claude. La salida estructurada admite hasta 16 campos con null
+# (uniones): los textos se piden como cadena, "" si no figuran, y normalizar() los
+# pasa a null. Números, items e impuestos sí admiten null.
+
+
+class ImpuestoExtraido(_Estricto):
+    descripcion_impuesto: str
+    importe: float | None
+
+
+class ItemExtraido(_Estricto):
+    codigo: str
+    descripcion: str
+    cantidad: float | None
+    precio_unitario: float | None
+    subtotal_item: float | None
+
+
+class FacturaExtraida(_Estricto):
+    punto_venta: int | None
+    numero_comprobante: int | None
+    cuit_emisor: str
+    razon_social_emisor: str
+    domicilio_emisor: str
+    localidad_emisor: str
+    condicion_iva_emisor: str
+    cuit_receptor: str
+    razon_social_receptor: str
+    domicilio_receptor: str
+    localidad_receptor: str
+    condicion_iva_receptor: str
+    fecha_comprobante: str
+    condicion_venta: str
+    subtotal: float | None
+    impuestos: list[ImpuestoExtraido] | None
+    total: float | None
+    items: list[ItemExtraido] | None
+
+
 CAMPOS_LISTA = ("impuestos", "items")
 
 

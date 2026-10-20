@@ -4,7 +4,7 @@ import re
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
-from app.core.esquema import Factura, Impuesto, Item
+from app.core.esquema import Factura, FacturaExtraida, Impuesto, Item
 
 _FORMATOS_FECHA = ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y")
 
@@ -46,7 +46,8 @@ def _importe(valor: float | None) -> float | None:
     return float(Decimal(repr(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
-def normalizar(factura: Factura) -> Factura:
+def normalizar(factura: Factura | FacturaExtraida) -> Factura:
+    """La factura en el Esquema de salida; un texto vacío pasa a null."""
     datos = {
         campo: _texto(valor) if isinstance(valor, str) else valor
         for campo, valor in factura
