@@ -81,6 +81,33 @@ def test_comprobante_fuera_de_alcance_se_rechaza(lineas):
     assert motivo_de_rechazo(generar_pdf(lineas)) == "no_factura_a"
 
 
+def test_factura_a_sin_codigo_con_letra_a_se_acepta():
+    pdf = generar_pdf(["A", "Comprobante: 0012 - 00075812", "Total Factura: $ 45,500.01"])
+    assert motivo_de_rechazo(pdf) is None
+
+
+@pytest.mark.parametrize(
+    "lineas",
+    [
+        ["B", "Total Factura: $ 100.00"],
+        ["A", "Total: $ 100.00"],
+        ["A", "NOTA DE CRÉDITO", "Factura asociada: 0012-00075812"],
+        ["A", "NOTA DE DÉBITO", "Factura asociada: 0012-00075812"],
+        ["A", "RECIBO", "Cancela factura 0012-00075812"],
+        ["A", "REMITO", "Factura 0012-00075812"],
+        ["A", "LIQUIDACIÓN", "Factura 0012-00075812"],
+        ["A", "FACTURA DE CRÉDITO ELECTRÓNICA MiPyMEs (FCE)"],
+    ],
+    ids=["letra-b", "sin-palabra-factura", "nota-credito", "nota-debito", "recibo", "remito", "liquidacion", "fce"],
+)
+def test_comprobante_sin_codigo_fuera_de_alcance_se_rechaza(lineas):
+    assert motivo_de_rechazo(generar_pdf(lineas)) == "no_factura_a"
+
+
+def test_con_codigo_distinto_de_01_no_alcanza_la_letra_a():
+    assert motivo_de_rechazo(generar_pdf(["A", "FACTURA", "COD. 06"])) == "no_factura_a"
+
+
 def test_pdf_protegido_con_contrasena_se_rechaza():
     assert motivo_de_rechazo(generar_pdf(factura(), contrasena="secreta")) == "no_factura_a"
 

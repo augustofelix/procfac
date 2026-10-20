@@ -1,5 +1,6 @@
 import io
 import re
+import unicodedata
 
 import pdfplumber
 from pdfminer.pdfdocument import PDFPasswordIncorrect
@@ -13,6 +14,18 @@ CODIGO_FACTURA_A = 1
 _CODIGO = (
     re.compile(r"\bC[OÓ]D(?:IGO)?\.?\s*(?:N(?:RO|°|º|O)?\.?\s*)?:?\s*(\d{1,3})\b", re.IGNORECASE),
     re.compile(r"^\s*(\d{2,3})\s+FACTURA\b", re.IGNORECASE | re.MULTILINE),
+)
+# Sin código, la letra del comprobante sola en una línea
+_LETRA_A = re.compile(r"^\s*A\s*$", re.MULTILINE)
+# Sin código, estas menciones indican un comprobante fuera de alcance (texto sin tildes)
+_FUERA_DE_ALCANCE = (
+    "NOTA DE CREDITO",
+    "NOTA DE DEBITO",
+    "RECIBO",
+    "REMITO",
+    "LIQUIDACION",
+    "MIPYME",
+    "CREDITO ELECTRONICA",
 )
 
 # Punto de venta y número: "Punto de Venta: 00003 Comp. Nro: 00001234" o "N° 0003-00001234"
@@ -65,6 +78,21 @@ def numeracion(texto: str) -> tuple[int, int] | None:
     return None
 
 
+def _sin_tildes(texto: str) -> str:
+    return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().upper()
+
+
+def es_factura_a(textos: list[str]) -> bool:
+    """Todas las páginas con código tienen 01; sin código, alcanza con la letra A (RF-24)."""
+    texto = _sin_tildes("\n".join(textos))
+    if "FACTURA" not in texto:
+        return False
+    codigos = {codigo_comprobante(pagina) for pagina in textos} - {None}
+    if codigos:
+        return codigos == {CODIGO_FACTURA_A}
+    return bool(_LETRA_A.search(texto)) and not any(palabra in texto for palabra in _FUERA_DE_ALCANCE)
+
+
 def _textos_por_pagina(contenido: bytes, max_paginas: int) -> list[str]:
     try:
         pdf = pdfplumber.open(io.BytesIO(contenido))
@@ -90,7 +118,5 @@ def verificar_pdf(contenido: bytes, max_paginas: int) -> None:
     # Las copias ORIGINAL, DUPLICADO y TRIPLICADO repiten la numeración: una sola factura
     if len({numeracion(texto) for texto in textos} - {None}) > 1:
         raise Rechazo("mas_de_una_factura", "El PDF contiene más de una factura.")  # RF-18, AC-14
-    # Solo se admite factura A: todas las páginas con código deben tener 01 (RF-24)
-    codigos = {codigo_comprobante(texto) for texto in textos} - {None}
-    if codigos != {CODIGO_FACTURA_A} or not any("FACTURA" in texto.upper() for texto in textos):
+    if not es_factura_a(textos):
         raise Rechazo("no_factura_a", NO_FACTURA_A)
