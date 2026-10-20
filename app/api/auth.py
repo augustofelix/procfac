@@ -1,17 +1,14 @@
 import os
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated
 
-from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+from app.core.config import cargar_entorno
 from app.core.sesiones import Sesiones
 from app.core.usuarios import cargar_usuarios, credenciales_validas
-
-RUTA_ENV = Path(__file__).resolve().parents[2] / ".env"
 
 router = APIRouter()
 _sesiones = Sesiones()
@@ -20,7 +17,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 @lru_cache
 def obtener_usuarios() -> dict[str, str]:
-    load_dotenv(RUTA_ENV)
+    cargar_entorno()
     return cargar_usuarios(os.environ)
 
 
