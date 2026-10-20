@@ -97,6 +97,20 @@ def _tabla(campo: str, filas: list[dict] | None, no_obtenido: bool, clave: str) 
     return registros
 
 
+def campos(factura: dict, sufijo_clave: str, no_obtenidos: list[str]) -> dict:
+    """Un widget editable por campo del Esquema de salida; devuelve los valores cargados."""
+    valores = {}
+    for seccion, campos_seccion in SECCIONES.items():
+        st.markdown(f"#### {seccion}")
+        for campo in campos_seccion:
+            clave = f"{campo}_{sufijo_clave}"
+            if campo in CAMPOS_LISTA:
+                valores[campo] = _tabla(campo, factura[campo], campo in no_obtenidos, clave)
+            else:
+                valores[campo] = _campo(campo, factura[campo], campo in no_obtenidos, clave)
+    return valores
+
+
 def formulario(factura: dict, sufijo_clave: str) -> tuple[str, dict | None] | None:
     """Muestra los campos para validar (RF-12, RF-13, RF-16).
 
@@ -115,16 +129,8 @@ def formulario(factura: dict, sufijo_clave: str) -> tuple[str, dict | None] | No
         )
     st.caption("Los valores los extrajo una IA y pueden tener errores: revisalos antes de confirmar.")
 
-    valores = {}
     with st.form("validacion"):
-        for seccion, campos in SECCIONES.items():
-            st.markdown(f"#### {seccion}")
-            for campo in campos:
-                clave = f"{campo}_{sufijo_clave}"
-                if campo in CAMPOS_LISTA:
-                    valores[campo] = _tabla(campo, factura[campo], campo in no_obtenidos, clave)
-                else:
-                    valores[campo] = _campo(campo, factura[campo], campo in no_obtenidos, clave)
+        valores = campos(factura, sufijo_clave, no_obtenidos)
         confirmar, cancelar = st.columns(2)
         confirmado = confirmar.form_submit_button("Confirmar campos", type="primary")
         cancelado = cancelar.form_submit_button("Cancelar")
