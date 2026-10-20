@@ -111,3 +111,43 @@ def test_pdf_inexistente_corta_con_mensaje(carpeta):
 def test_pdf_sin_json_esperado_corta_con_mensaje(carpeta):
     with pytest.raises(SystemExit, match="Falta el JSON esperado 03.json"):
         _conjunto(["03"])
+
+
+@pytest.mark.parametrize(
+    ("obtenido", "esperado", "motivo"),
+    [
+        ("ACME SA", "ACME SA", None),
+        ("ACME  sa ", "ACME SA", "difieren solo en mayúsculas o espacios"),
+        ("IVA Responsable Inscripto", "Responsable Inscripto", "lo obtenido tiene texto de más"),
+        ("Lobos", "Lobos, Buenos Aires", "lo obtenido tiene texto de menos"),
+        ("Otra cosa", "ACME SA", "texto distinto"),
+        (None, "ACME SA", "esperado con dato, obtenido null"),
+        ("ACME SA", None, "esperado null, obtenido con dato"),
+        (10.0, 10, None),
+        (10.5, 10, "número distinto"),
+        ("10", 10, "tipo distinto"),
+    ],
+)
+def test_clasificar_diferencias(obtenido, esperado, motivo):
+    from tests.evaluacion import _clasificar
+
+    assert _clasificar(obtenido, esperado) == motivo
+
+
+def test_diferencias_sin_mostrar_valores():
+    from tests.evaluacion import diferencias
+
+    obtenida = ESPERADA | {
+        "total": 1.0,
+        "impuestos": [{"descripcion_impuesto": "IVA 21 %", "importe": 24.15}],
+        "items": [ITEMS[0] | {"descripcion": "TORNILLO"}, ITEMS[1], ITEMS[1]],
+    }
+    lineas = diferencias(obtenida, ESPERADA)
+    assert lineas == [
+        "total: número distinto",
+        "impuestos: esperados 2, obtenidos 1",
+        "impuestos[1].descripcion_impuesto: difieren solo en mayúsculas o espacios",
+        "items: esperados 2, obtenidos 3",
+        "items[1].descripcion: difieren solo en mayúsculas o espacios",
+    ]
+    assert not any("Tornillo" in linea or "139" in linea for linea in lineas)

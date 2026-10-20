@@ -6,8 +6,11 @@ esperado al lado (mismo nombre, extensión .json) es una factura del conjunto.
     uv run python -m tests.evaluacion                  # precisión y p95 (AC-01, AC-15, AC-16, AC-20, AC-21, AC-27, AC-31)
     uv run python -m tests.evaluacion --simultaneas 5  # 5 extracciones a la vez (AC-29)
     uv run python -m tests.evaluacion --pdf 01 07      # solo esas facturas
+    uv run python -m tests.evaluacion --pdf 01 --detalle --guardar
+                                                       # qué difiere, y lo obtenido en 01.obtenido.json
 
-Solo informa nombres de campos y porcentajes, nunca valores de las facturas.
+Solo informa nombres de campos, porcentajes y tipos de diferencia, nunca valores de las
+facturas; con --guardar, lo obtenido queda en tests/data/ (fuera del repositorio).
 """
 
 import argparse
@@ -71,6 +74,54 @@ def comparar(obtenida: dict | None, esperada: dict) -> dict[str, bool]:
     return aciertos
 
 
+def _clasificar(obtenido, esperado) -> str | None:
+    """Cómo difieren dos valores, sin mostrarlos; None si coinciden."""
+    if obtenido == esperado:
+        return None
+    if esperado is None:
+        return "esperado null, obtenido con dato"
+    if obtenido is None:
+        return "esperado con dato, obtenido null"
+    if isinstance(obtenido, str) and isinstance(esperado, str):
+        def simple(texto):
+            # Sin ningún espacio: "IVA 21 %" y "IVA 21%" difieren solo en espacios
+            return "".join(texto.split()).casefold()
+
+        if simple(obtenido) == simple(esperado):
+            return "difieren solo en mayúsculas o espacios"
+        if simple(esperado) in simple(obtenido):
+            return "lo obtenido tiene texto de más"
+        if simple(obtenido) in simple(esperado):
+            return "lo obtenido tiene texto de menos"
+        return "texto distinto"
+    if isinstance(obtenido, (int, float)) and isinstance(esperado, (int, float)):
+        return "número distinto"
+    return "tipo distinto"
+
+
+def diferencias(obtenida: dict, esperada: dict) -> list[str]:
+    """Una línea por diferencia entre lo obtenido y lo esperado, sin valores."""
+    lineas = [
+        f"{campo}: {motivo}"
+        for campo in CAMPOS_ESCALARES
+        if (motivo := _clasificar(obtenida[campo], esperada[campo]))
+    ]
+    for lista, campos in (("impuestos", ["descripcion_impuesto", "importe"]), ("items", ["cantidad", *CAMPOS_ITEM])):
+        obtenidos, esperados = obtenida[lista], esperada[lista]
+        if obtenidos is None or esperados is None:
+            if motivo := _clasificar(obtenidos, esperados):
+                lineas.append(f"{lista}: {motivo}")
+            continue
+        if len(obtenidos) != len(esperados):
+            lineas.append(f"{lista}: esperados {len(esperados)}, obtenidos {len(obtenidos)}")
+        # Por posición; impuestos no exige orden, pero así se ve en qué campo difiere cada uno
+        for posicion, (o, e) in enumerate(zip(obtenidos, esperados), 1):
+            for campo in campos:
+                if motivo := _clasificar(o[campo], e[campo]):
+                    lineas.append(f"{lista}[{posicion}].{campo}: {motivo}")
+    return lineas
+
+
 def percentil_95(tiempos: list[float]) -> float:
     """Percentil 95 por rango más cercano."""
     ordenados = sorted(tiempos)
@@ -106,7 +157,7 @@ def _conjunto(nombres: list[str] | None = None) -> list[tuple[Path, dict]]:
     return [(pdf, json.loads(pdf.with_suffix(".json").read_text(encoding="utf-8"))) for pdf in pdfs if pdf.with_suffix(".json").exists()]
 
 
-async def evaluar(detalle: bool, nombres: list[str] | None = None) -> None:
+async def evaluar(detalle: bool, nombres: list[str] | None = None, guardar: bool = False) -> None:
     conjunto = _conjunto(nombres)
     if not conjunto:
         raise SystemExit(f"No hay PDF con su JSON esperado en {CARPETA}")
@@ -127,10 +178,13 @@ async def evaluar(detalle: bool, nombres: list[str] | None = None) -> None:
         resultados.append(aciertos)
         estado = f"FALLÓ ({fallo})" if fallo else f"{sum(aciertos.values())}/{len(aciertos)} métricas"
         print(f"{segundos:5.1f} s  {pdf.name}: {estado}")
+        if guardar and not fallo:
+            destino = pdf.with_name(f"{pdf.stem}.obtenido.json")
+            destino.write_text(json.dumps(obtenida, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            print(f"         obtenido en {destino.name}")
         if detalle and not fallo:
-            errores = [metrica for metrica, ok in aciertos.items() if not ok]
-            if errores:
-                print("         no coinciden: " + ", ".join(errores))
+            for linea in diferencias(obtenida, esperada):
+                print(f"         {linea}")
 
     total = len(resultados)
     # Una respuesta que llega sin fallo ya pasó la validación del Esquema de salida
@@ -170,11 +224,14 @@ def main() -> None:
     argumentos.add_argument(
         "--pdf", nargs="+", metavar="NOMBRE", help="evalúa solo esos PDF de tests/data/ (por ejemplo 01 o 01.PDF)"
     )
+    argumentos.add_argument(
+        "--guardar", action="store_true", help="guarda lo obtenido en tests/data/<pdf>.obtenido.json para compararlo"
+    )
     opciones = argumentos.parse_args()
     if opciones.simultaneas:
         asyncio.run(evaluar_simultaneas(opciones.simultaneas, opciones.pdf))
     else:
-        asyncio.run(evaluar(opciones.detalle, opciones.pdf))
+        asyncio.run(evaluar(opciones.detalle, opciones.pdf, opciones.guardar))
 
 
 if __name__ == "__main__":
