@@ -1,5 +1,7 @@
 """Pantalla para que el usuario valide, corrija y complete los campos extraídos."""
 
+import json
+
 import pandas as pd
 import streamlit as st
 
@@ -98,7 +100,8 @@ def _tabla(campo: str, filas: list[dict] | None, no_obtenido: bool, clave: str) 
 def formulario(factura: dict, sufijo_clave: str) -> tuple[str, dict | None] | None:
     """Muestra los campos para validar (RF-12, RF-13, RF-16).
 
-    Devuelve ("cancelar", None) si el usuario cancela, o None mientras no decide.
+    Devuelve ("confirmar", valores) cuando el usuario los valida de forma explícita,
+    ("cancelar", None) si cancela, o None mientras no decide.
     """
     modelo = Factura.model_validate(factura)
     no_obtenidos = campos_no_obtenidos(modelo)
@@ -122,7 +125,19 @@ def formulario(factura: dict, sufijo_clave: str) -> tuple[str, dict | None] | No
                     valores[campo] = _tabla(campo, factura[campo], campo in no_obtenidos, clave)
                 else:
                     valores[campo] = _campo(campo, factura[campo], campo in no_obtenidos, clave)
-        cancelado = st.form_submit_button("Cancelar")
+        confirmar, cancelar = st.columns(2)
+        confirmado = confirmar.form_submit_button("Confirmar campos", type="primary")
+        cancelado = cancelar.form_submit_button("Cancelar")
+    if confirmado:
+        return "confirmar", valores
     if cancelado:
         return "cancelar", None
     return None
+
+
+def armar_json(valores: dict) -> str:
+    """El JSON a descargar, con los campos en el orden del Esquema de salida (RF-07).
+
+    Los valores corregidos o completados por el usuario no se validan (fuera del alcance).
+    """
+    return json.dumps({campo: valores[campo] for campo in Factura.model_fields}, ensure_ascii=False, indent=2)

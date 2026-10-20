@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import httpx
 import streamlit as st
 
@@ -175,7 +177,10 @@ def pantalla_extraccion() -> None:
         except httpx.HTTPError:
             avisar("error", FALLO_EXTRACCION)
             volver_a_carga()
-    pantalla_validacion()
+    if "validada" in st.session_state:
+        pantalla_descarga()
+    else:
+        pantalla_validacion()
 
 
 def pantalla_validacion() -> None:
@@ -183,10 +188,33 @@ def pantalla_validacion() -> None:
     decision = validacion.formulario(st.session_state.factura, str(st.session_state.get("carga_id", 0)))
     if decision is None:
         return
-    accion, _ = decision
+    accion, valores = decision
+    if accion == "confirmar":
+        st.session_state.validada = valores
+        st.rerun()
     if accion == "cancelar":
         # RF-14, AC-10
         avisar("info", "Proceso cancelado: no se entregó ningún JSON.")
+        volver_a_carga()
+
+
+
+def pantalla_descarga() -> None:
+    # La descarga existe solo después de validar los campos (RF-21, AC-26)
+    st.subheader("Descargar JSON")
+    st.success("Campos validados.")
+    nombre = Path(st.session_state.pdf[0]).with_suffix(".json").name
+    # El JSON se arma en memoria y no se guarda en el servidor (RNF-07)
+    st.download_button(
+        "Descargar JSON",
+        data=validacion.armar_json(st.session_state.validada),
+        file_name=nombre,
+        mime="application/json",
+        type="primary",
+    )
+    with st.expander("Ver JSON"):
+        st.json(st.session_state.validada)
+    if st.button("Procesar otra factura"):
         volver_a_carga()
 
 
